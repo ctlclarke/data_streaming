@@ -2,41 +2,52 @@ package main
 
 import (
     "fmt"
-    MQTT "github.com/eclipse/paho.mqtt.golang"
     "os"
     "os/signal"
-    "syscall"
+
+    "github.com/yosssi/gmq/mqtt"
+    "github.com/yosssi/gmq/mqtt/client"
 )
 
-var knt int
-var f MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
-    fmt.Printf("MSG: %s\n", msg.Payload())
-    text := fmt.Sprintf("this is result msg #%d!", knt)
-    knt++
-    token := client.Publish("nn/result", 0, false, text)
-    token.Wait()
-}
-
 func main() {
-    knt = 0
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+    // Set up channel on which to send signal notifications.
+    sigc := make(chan os.Signal, 1)
+    signal.Notify(sigc, os.Interrupt, os.Kill)
 
-    opts := MQTT.NewClientOptions().AddBroker("http://172.28.42.32:15675")
-    // opts.SetClientID("mac-go")
-    opts.SetDefaultPublishHandler(f)
-    topic := "dylon"
+    // Create an MQTT Client.
+    cli := client.New(&client.Options{
+        // Define the processing of the error handler.
+        ErrorHandler: func(err error) {
+            fmt.Println(err)
+        },
+    })
 
-    opts.OnConnect = func(c MQTT.Client) {
-            if token := c.Subscribe(topic, 0, f); token.Wait() && token.Error() != nil {
-                    panic(token.Error())
-            }
+    // Terminate the Client.
+    defer cli.Terminate()
+
+    // Connect to the MQTT Server.
+    err := cli.Connect(&client.ConnectOptions{
+        Network:  "tcp",
+        Address:  "172.28.42.32:15675",
+        ClientID: []byte("dylon"),
+    })
+    if err != nil {
+        panic(err)
     }
-    client := MQTT.NewClient(opts)
-    if token := client.Connect(); token.Wait() && token.Error() != nil {
-            panic(token.Error())
-    } else {
-            fmt.Printf("Connected to server\n")
+
+  
+    // Publish a message.
+    err = cli.Publish(&client.PublishOptions{
+        QoS:       mqtt.QoS0,
+        TopicName: []byte("bar/baz"),
+        Message:   []byte("testMessage"),
+    })
+    if err != nil {
+        panic(err)
     }
-    <-c
+
+    // Disconnect the Network Connection.
+    if err := cli.Disconnect(); err != nil {
+        panic(err)
+    }
 }
