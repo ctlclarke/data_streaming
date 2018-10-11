@@ -4,7 +4,7 @@ import (
     "fmt"
     "os"
     "os/signal"
-
+    "math/rand"
     "github.com/yosssi/gmq/mqtt"
     "github.com/yosssi/gmq/mqtt/client"
 )
@@ -35,15 +35,19 @@ func main() {
         panic(err)
     }
 
-  
-    // Publish a message.
-    err = cli.Publish(&client.PublishOptions{
-        QoS:       mqtt.QoS0,
-        TopicName: []byte("bar/baz"),
-        Message:   []byte("testMessage"),
-    })
-    if err != nil {
-        panic(err)
+    for i := 0; i < 100; i++ {
+        go func(x int, y int) {
+             // Publish a message.
+            err = cli.Publish(&client.PublishOptions{
+                QoS:       mqtt.QoS0,
+                TopicName: []byte("bar/baz"),
+                Message:   []byte("testMessage"),
+            })
+            if err != nil {
+                panic(err)
+            }
+            fmt.Println("Sent")
+        }(rand.Intn(100), rand.Intn(100))
     }
 
     // Disconnect the Network Connection.
